@@ -1,10 +1,10 @@
-# 🤖 Tool Tự Động Kiểm Tra Đăng Ký NAFIQAD
+# 🤖 Tool Tự Động Kiểm Tra Đăng Ký xxx
 
-Tool tự động kiểm tra trang đăng ký NAFIQAD và gửi email thông báo khi có thể đăng ký được.
+Tool tự động kiểm tra trang đăng ký  và gửi email thông báo khi có thể đăng ký được.
 
 ## 📋 Tính Năng
 
-- ✅ Tự động đăng nhập vào hệ thống NAFIQAD
+- ✅ Tự động đăng nhập vào hệ thống 
 - ✅ Tự động kiểm tra trang web mỗi 30 giây (có thể tùy chỉnh)
 - ✅ Phát hiện khi form đăng ký xuất hiện
 - ✅ Gửi email thông báo ngay lập tức đến 2 địa chỉ
