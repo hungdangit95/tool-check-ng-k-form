@@ -29,27 +29,7 @@ pip install -r requirements.txt
 
 ### 1. Chỉnh sửa file `config.json`
 
-```json
-{
-  "login_url": "https://nafiqpm1.vn/thanhvien/dangnhaptaikhoan",
-  "target_url": "https://nafiqpm1.vn/thanhvien/dangkylaymau",
-  "username": "your_username",
-  "password": "your_password",
-  "form_indicators": [
-    "Đăng ký lấy mẫu trái cây tươi",
-    "Tên mẫu",
-    "Ngày lấy mẫu",
-    "File đính kèm"
-  ],
-  "check_interval_minutes": 0.5,
-  "email": {
-    "to": "email1@gmail.com, email2@gmail.com",
-    "from": "your_email@gmail.com",
-    "password": "your_app_password",
-    "smtp_server": "smtp.gmail.com",
-    "smtp_port": 587
-  }
-}
+
 ```
 
 ### 2. Cấu hình Gmail để gửi email
@@ -84,13 +64,6 @@ python check_registration.py
 
 ### Kết quả:
 ```
-============================================================
-🚀 TOOL KIỂM TRA ĐĂNG KÝ NAFIQAD
-============================================================
-🌐 URL: https://dichvucong.nafiqad.gov.vn/
-📧 Email nhận thông báo: hungdangit95@gmail.com
-⏱️  Kiểm tra mỗi: 1 phút
-============================================================
 
 [2025-12-28 10:30:00] Đang kiểm tra trang web...
 ❌ Chưa mở đăng ký (vẫn có thông báo hết slot)
@@ -168,7 +141,6 @@ Xin chào!
 
 Trang web đăng ký đã MỞ và có thể đăng ký được rồi!
 
-🔗 Link: https://dichvucong.nafiqad.gov.vn/
 ⏰ Thời gian phát hiện: 2025-12-28 10:31:00
 
 Hãy truy cập ngay để đăng ký!
