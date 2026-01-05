@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 import json
 import os
 import sys
+import pickle
 from urllib.parse import urljoin
 
 # Fix encoding và unbuffered output trên Windows
@@ -47,6 +48,8 @@ class RegistrationChecker:
         self.email_sent = False
         self.session = requests.Session()  # Session để duy trì cookie
         self.is_logged_in = False
+        self.cookies_file = 'session_cookies.pkl'
+        self.load_session()
         
     def load_config(self, config_file):
         """Đọc config từ file JSON"""
@@ -70,10 +73,7 @@ class RegistrationChecker:
                 "username": "ctyvuongminh",
                 "password": "hanoi1234@",
                 "form_indicators": [
-                    "Đăng ký lấy mẫu trái cây tươi",
-                    "Tên mẫu",
-                    "Ngày lấy mẫu",
-                    "File đính kèm"
+                    "Tên mẫu"
                 ],
                 "check_interval_minutes": 0.5,
                 "email": {
@@ -85,70 +85,147 @@ class RegistrationChecker:
                 }
             }
     
+    def save_session(self):
+        """Lưu session cookies vào file"""
+        try:
+            with open(self.cookies_file, 'wb') as f:
+                pickle.dump(self.session.cookies, f)
+            print(f"[SESSION] Đã lưu session vào {self.cookies_file}")
+        except Exception as e:
+            print(f"[SESSION] Lỗi khi lưu session: {e}")
+    
+    def load_session(self):
+        """Tải session cookies từ file"""
+        try:
+            if os.path.exists(self.cookies_file):
+                with open(self.cookies_file, 'rb') as f:
+                    cookies = pickle.load(f)
+                    self.session.cookies.update(cookies)
+                print(f"[SESSION] Đã tải {len(cookies)} cookies từ {self.cookies_file}")
+                # Kiểm tra session còn hợp lệ không
+                self.verify_session()
+            else:
+                print(f"[SESSION] Chưa có file session {self.cookies_file}")
+        except Exception as e:
+            print(f"[SESSION] Lỗi khi tải session: {e}")
+    
+    def verify_session(self):
+        """Kiểm tra session còn hợp lệ không"""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = self.session.get(self.config['target_url'], headers=headers, timeout=5)
+            
+            # Nếu không bị redirect về login thì session còn hợp lệ
+            if 'dangnhaptaikhoan' not in response.url and 'Dang nhap' not in response.text:
+                print("[SESSION] Session còn hợp lệ, không cần đăng nhập lại")
+                self.is_logged_in = True
+            else:
+                print("[SESSION] Session đã hết hạn")
+                self.is_logged_in = False
+        except Exception as e:
+            print(f"[SESSION] Lỗi khi kiểm tra session: {e}")
+            self.is_logged_in = False
+    
     def login(self):
         """Đăng nhập vào hệ thống"""
         try:
             print(f"[LOGIN] Dang dang nhap voi user: {self.config['username']}...")
             
-            # Lấy API URL từ config hoặc dùng mặc định
-            login_api_url = self.config.get('login_api_url', 'https://nafiqpm1.vn/thanhvien/checkdangnhap')
-            print(f"[LOGIN] Dang ket noi den: {login_api_url}...")
+            # Bước 1: Truy cập trang login trước để lấy session/cookies
+            login_page_url = self.config.get('login_url', 'https://nafiqpm1.vn/thanhvien/dangnhaptaikhoan')
+            print(f"[LOGIN] Buoc 1: Truy cap trang login: {login_page_url}")
             
-            # Dữ liệu đăng nhập theo format JSON
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            # GET trang login để lấy session
+            login_page_response = self.session.get(login_page_url, headers=headers, timeout=5)
+            print(f"[LOGIN] Trang login status: {login_page_response.status_code}")
+            print(f"[LOGIN] Cookies sau khi truy cap trang login: {len(self.session.cookies)}")
+            
+            # Bước 2: Thử cả form-based và JSON API
+            login_api_url = self.config.get('login_api_url', 'https://nafiqpm1.vn/thanhvien/checkdangnhap')
+            print(f"[LOGIN] Buoc 2: Thu form-based login den: {login_api_url}")
+            
+            # Thử form-based login trước
             login_data = {
                 'user': self.config['username'],
                 'pass': self.config['password']
             }
             
-            # Headers cho POST request
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Content-Type': 'application/json',
-                'Referer': self.config.get('login_url', 'https://nafiqpm1.vn/thanhvien/dangnhaptaikhoan')
-            }
+            # Headers cho form POST
+            headers.update({
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': login_page_url
+            })
             
-            print(f"[LOGIN] POST den: {login_api_url}")
-            print(f"[LOGIN] Data: {login_data}")
-            print(f"[LOGIN] Dang gui POST request...")
-            
-            # POST request để đăng nhập với JSON data
+            print(f"[LOGIN] Thu form-based POST...")
             response = self.session.post(
                 login_api_url,
-                json=login_data,
+                data=login_data,  # Dùng data thay vì json
                 headers=headers,
                 timeout=5,
                 allow_redirects=True
             )
             
-            print(f"[LOGIN] Response status: {response.status_code}")
+            print(f"[LOGIN] Form-based response status: {response.status_code}")
             print(f"[LOGIN] Response URL: {response.url}")
-            print(f"[LOGIN] Cookies: {len(self.session.cookies)} cookies")
+            print(f"[LOGIN] Cookies sau form-based: {len(self.session.cookies)}")
             
-            # Kiểm tra đăng nhập thành công
+            # Nếu form-based không thành công, thử JSON
+            if len(self.session.cookies) == 0 or response.status_code != 200:
+                print(f"[LOGIN] Thu JSON API...")
+                headers['Content-Type'] = 'application/json'
+                
+                response = self.session.post(
+                    login_api_url,
+                    json=login_data,
+                    headers=headers,
+                    timeout=5,
+                    allow_redirects=True
+                )
+                print(f"[LOGIN] JSON response status: {response.status_code}")
+                print(f"[LOGIN] Cookies sau JSON: {len(self.session.cookies)}")
+            
+            # In chi tiết cookies để debug
+            for cookie in self.session.cookies:
+                print(f"[LOGIN] Cookie: {cookie.name}={cookie.value[:20]}...")
+            
+            # Kiểm tra đăng nhập thành công bằng cách kiểm tra response
+            login_success = False
+            
             if response.status_code == 200:
-                # Kiểm tra response có thành công không
-                # Thường API sẽ trả về JSON với status hoặc redirect
                 try:
                     response_json = response.json()
                     print(f"[LOGIN] Response JSON: {response_json}")
-                    # Nếu có status success hoặc có cookies thì coi như thành công
-                    if len(self.session.cookies) > 0:
-                        print("[LOGIN] Dang nhap thanh cong! (co cookies)")
-                        self.is_logged_in = True
-                        return True
+                    # Kiểm tra response có thông báo thành công không
+                    if isinstance(response_json, dict):
+                        if response_json.get('success') or response_json.get('status') == 'success':
+                            login_success = True
+                        elif 'không đúng' in str(response_json).lower() or 'sai' in str(response_json).lower():
+                            print("[LOGIN] Tên đăng nhập hoặc mật khẩu không đúng")
+                            return False
                 except:
-                    # Nếu không phải JSON, kiểm tra cookies
-                    if len(self.session.cookies) > 0:
-                        print("[LOGIN] Dang nhap thanh cong! (co cookies)")
-                        self.is_logged_in = True
-                        return True
-                    else:
-                        print("[LOGIN] Khong co cookies - co the sai username/password")
-                        print(f"[LOGIN] Response text: {response.text[:200]}")
+                    response_text = response.text[:500]
+                    print(f"[LOGIN] Response text: {response_text}")
+                    # Kiểm tra có thông báo lỗi không
+                    if 'không đúng' in response_text.lower() or 'sai' in response_text.lower():
+                        print("[LOGIN] Tên đăng nhập hoặc mật khẩu không đúng")
                         return False
+                    # Nếu có cookies và không có thông báo lỗi thì coi như thành công
+                    if len(self.session.cookies) > 0:
+                        login_success = True
+            
+            if login_success or (response.status_code == 200 and len(self.session.cookies) > 0):
+                print("[LOGIN] Đăng nhập thành công!")
+                self.is_logged_in = True
+                self.save_session()
+                return True
             else:
-                print(f"[LOGIN] Loi dang nhap: Status code {response.status_code}")
-                print(f"[LOGIN] Response text: {response.text[:200]}")
+                print(f"[LOGIN] Đăng nhập thất bại: Status {response.status_code}, Cookies: {len(self.session.cookies)}")
                 return False
                 
         except Exception as e:
@@ -162,21 +239,21 @@ class RegistrationChecker:
         try:
             print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Dang kiem tra trang web...")
             
-            # Đăng nhập nếu chưa đăng nhập
+            # Đăng nhập nếu chưa đăng nhập hoặc session hết hạn
             if not self.is_logged_in:
-                print("[CHECK] Chua dang nhap, dang nhap lai...")
+                print("[CHECK] Chưa đăng nhập hoặc session hết hạn, đăng nhập lại...")
                 if not self.login():
-                    print("[CHECK] Khong the dang nhap, thu lai lan sau...")
+                    print("[CHECK] Không thể đăng nhập, thử lại lần sau...")
                     return None
             else:
-                print("[CHECK] Da dang nhap, tiep tuc kiem tra...")
+                print("[CHECK] Đã đăng nhập, tiếp tục kiểm tra...")
             
             # Gửi request đến trang đăng ký với session đã login
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Referer': self.config['login_url']
             }
-            
+            print("file la:",self.config['target_url'])
             print(f"[CHECK] GET: {self.config['target_url']}")
             print(f"[CHECK] Dang ket noi...")
             response = self.session.get(
@@ -200,10 +277,21 @@ class RegistrationChecker:
             soup = BeautifulSoup(response.text, 'html.parser')
             page_text = soup.get_text()
             
+            # Debug: Hiển thị URL và một phần nội dung để đảm bảo đúng trang
+            print(f"[CHECK] Dang kiem tra noi dung tu URL: {response.url}")
+            print(f"[CHECK] Noi dung trang (100 ky tu dau): {page_text[:100].strip()}")
+            
             # Kiểm tra có bị redirect về trang login không
-            if 'dangnhaptaikhoan' in response.url or 'Ten dang nhap' in page_text or 'Dang nhap' in page_text:
-                print("[CHECK] Bi redirect ve trang login, dang nhap lai...")
+            if ('dangnhaptaikhoan' in response.url or 
+                'Tên đăng nhập' in page_text or 
+                'Đăng nhập' in page_text or
+                'Vui lòng nhập tên đăng nhập' in page_text):
+                print("[CHECK] Bị redirect về trang login hoặc chưa đăng nhập thành công...")
                 self.is_logged_in = False
+                # Xóa file session cũ
+                if os.path.exists(self.cookies_file):
+                    os.remove(self.cookies_file)
+                    print("[CHECK] Đã xóa session cũ")
                 return None
             
             # Parse form đăng ký từ trang dangkylaymau
@@ -211,49 +299,14 @@ class RegistrationChecker:
             forms = soup.find_all('form')
             print(f"[CHECK] Tim thay {len(forms)} form(s) trong trang")
             
-            # Tìm form đăng ký (form có các field đặc trưng)
-            form_indicators = self.config.get('form_indicators', [
-                "Đăng ký lấy mẫu trái cây tươi",
-                "Tên mẫu",
-                "Ngày lấy mẫu",
-                "File đính kèm"
-            ])
-            
-            # Kiểm tra trong text và trong form HTML
-            found_indicators = []
-            form_found = False
-            
+            # Chỉ cần tìm "Tên mẫu" là gửi mail
+            target_text = "Tên mẫu"
             # Kiểm tra text trong trang
-            for indicator in form_indicators:
-                if indicator in page_text:
-                    found_indicators.append(indicator)
-                    print(f"[CHECK] Tim thay text: {indicator}")
-            
-            # Kiểm tra form HTML có các input field đặc trưng không
-            for form in forms:
-                form_html = str(form).lower()
-                # Tìm các field đặc trưng trong form
-                if 'ten mau' in form_html or 'ngay lay mau' in form_html or 'file dinh kem' in form_html:
-                    form_found = True
-                    print(f"[CHECK] Tim thay form dang ky voi cac field can thiet!")
-                    # Lấy action URL của form nếu có
-                    if form.get('action'):
-                        print(f"[CHECK] Form action: {form.get('action')}")
-                    break
-            
-            found_count = len(found_indicators)
-            
-            # Nếu tìm thấy form HOẶC ít nhất 2/4 indicators thì coi như form đã xuất hiện
-            if form_found or found_count >= 2:
-                if form_found:
-                    print(f"[CHECK] *** FORM DANG KY DA XUAT HIEN! (Tim thay form HTML) ***")
-                else:
-                    print(f"[CHECK] *** FORM DANG KY DA XUAT HIEN! (Tim thay {found_count}/{len(form_indicators)} yeu to) ***")
+            if target_text in page_text:
+                print(f"[CHECK] *** FORM ĐĂNG KÝ ĐÃ XUẤT HIỆN! (Tìm thấy: {target_text}) ***")
                 return True
             else:
-                print(f"[CHECK] Chua co form dang ky (Chi tim thay {found_count}/{len(form_indicators)} yeu to, khong co form HTML)")
-                if found_count > 0:
-                    print(f"[CHECK] Cac yeu to tim thay: {', '.join(found_indicators)}")
+                print(f"[CHECK] Chưa có form đăng ký (Không tìm thấy: {target_text})")
                 return False
                 
         except requests.exceptions.RequestException as e:

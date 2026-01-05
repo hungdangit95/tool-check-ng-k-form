@@ -1,0 +1,5 @@
+# Minimal requirements - try this if SSL issues persist
+# These are older, more compatible versions
+requests==2.25.1
+beautifulsoup4==4.9.3
+schedule==1.1.0

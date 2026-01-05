@@ -1,8 +1,8 @@
 {
   "login_url": "https://nafiqpm1.vn/thanhvien/dangnhaptaikhoan",
   "target_url": "https://nafiqpm1.vn/thanhvien/dangkylaymau",
-  "username": "your_username",
-  "password": "your_password",
+  "username": "ctyvuongminh",
+  "password": "hanoi1234@",
   "form_indicators": [
     "Đăng ký lấy mẫu trái cây tươi",
     "Tên mẫu",
@@ -11,9 +11,9 @@
   ],
   "check_interval_minutes": 0.5,
   "email": {
-    "to": "email1@gmail.com, email2@gmail.com",
-    "from": "your_sender_email@gmail.com",
-    "password": "your_16_character_app_password",
+    "to": "npahuph@gmail.com, hungdangit95@gmail.com",
+    "from": "hungdangit95@gmail.com",
+    "password": "tqpw yrcs wxvh zuax",
     "smtp_server": "smtp.gmail.com",
     "smtp_port": 587
   }
